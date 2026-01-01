@@ -19,13 +19,11 @@ type Word struct {
 
 type SavedWord struct {
 	WordID  string    `json:"wordId"`
-	UserID  string    `json:"userId"`
 	SavedAt time.Time `json:"savedAt"`
 }
 
 type Sentence struct {
 	WordID  string `json:"wordId"`
-	UserID  string `json:"userId"`
 	Content string `json:"content"`
 }
 
@@ -40,7 +38,7 @@ var (
 func enableCors(w *http.ResponseWriter) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-User-Email")
+	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 }
 
 // Helpers
@@ -141,12 +139,6 @@ func savedWordsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := r.Header.Get("X-User-Email")
-	if userID == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -154,14 +146,8 @@ func savedWordsHandler(w http.ResponseWriter, r *http.Request) {
 	loadJSON(savedFile, &saved)
 
 	if r.Method == "GET" {
-		userSaved := []SavedWord{}
-		for _, s := range saved {
-			if s.UserID == userID {
-				userSaved = append(userSaved, s)
-			}
-		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(userSaved)
+		json.NewEncoder(w).Encode(saved)
 		return
 	}
 
@@ -174,9 +160,9 @@ func savedWordsHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Check for duplicates for this user
+		// Check for duplicates
 		for _, s := range saved {
-			if s.WordID == req.WordID && s.UserID == userID {
+			if s.WordID == req.WordID {
 				w.WriteHeader(http.StatusOK) // Already saved
 				return
 			}
@@ -184,7 +170,6 @@ func savedWordsHandler(w http.ResponseWriter, r *http.Request) {
 
 		saved = append(saved, SavedWord{
 			WordID:  req.WordID,
-			UserID:  userID,
 			SavedAt: time.Now(),
 		})
 		saveJSON(savedFile, saved)
@@ -201,8 +186,7 @@ func savedWordsHandler(w http.ResponseWriter, r *http.Request) {
 
 		newSaved := []SavedWord{}
 		for _, s := range saved {
-			// Keep if it's NOT the item to delete, OR if it belongs to another user
-			if s.WordID != id || s.UserID != userID {
+			if s.WordID != id {
 				newSaved = append(newSaved, s)
 			}
 		}
@@ -218,12 +202,6 @@ func sentencesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := r.Header.Get("X-User-Email")
-	if userID == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -231,14 +209,12 @@ func sentencesHandler(w http.ResponseWriter, r *http.Request) {
 	loadJSON(sentencesFile, &sentences)
 
 	if r.Method == "GET" {
-		// Filter by wordID if present, AND userID
+		// Filter by wordID if present
 		wordID := r.URL.Query().Get("wordId")
 		filtered := []Sentence{}
 		for _, s := range sentences {
-			if s.UserID == userID {
-				if wordID == "" || s.WordID == wordID {
-					filtered = append(filtered, s)
-				}
+			if wordID == "" || s.WordID == wordID {
+				filtered = append(filtered, s)
 			}
 		}
 		json.NewEncoder(w).Encode(filtered)
@@ -251,7 +227,6 @@ func sentencesHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		newSentence.UserID = userID
 		sentences = append(sentences, newSentence)
 		saveJSON(sentencesFile, sentences)
 		w.WriteHeader(http.StatusCreated)

@@ -1,24 +1,5 @@
+```javascript
 const API_URL = "http://localhost:8080/api";
-
-// --- FIREBASE CONFIGURATION ---
-// REPLACE THIS OBJECT WITH YOUR OWN KEY from console.firebase.google.com
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
-
-// Initialize Firebase
-let auth;
-try {
-    firebase.initializeApp(firebaseConfig);
-    auth = firebase.auth();
-} catch (error) {
-    console.warn("Firebase not configured correctly yet. Using Dev Mode only.");
-}
 
 // State
 let allWords = [];
@@ -26,7 +7,6 @@ let savedList = [];
 let savedIds = new Set();
 let currentTab = 'browse'; // 'browse' | 'saved'
 let practiceWord = null;
-let currentUser = null; // { email, name, picture }
 
 // DOM Elements
 const wordGrid = document.getElementById('word-grid');
@@ -43,47 +23,8 @@ const prevSentencesList = document.getElementById('previous-sentences-list');
 
 // Initialization
 async function init() {
-    // Auth Listener
-    if (auth) {
-        auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                // Firebase Login Success
-                currentUser = {
-                    email: user.email,
-                    name: user.displayName || user.email.split('@')[0],
-                    picture: user.photoURL || `https://ui-avatars.com/api/?name=${user.email}&background=random`
-                };
-                finishLogin();
-            } else {
-                // Check if Dev Mode was active (mock user)
-                const storedUser = localStorage.getItem('vocab_user_dev');
-                if (storedUser) {
-                    currentUser = JSON.parse(storedUser);
-                    finishLogin();
-                } else {
-                    // Show Login
-                    document.getElementById('login-overlay').classList.remove('hidden');
-                    document.getElementById('login-btn').classList.add('hidden');
-                    currentUser = null;
-                    savedList = []; // Clear private data
-                    updateProfileUI();
-                    await loadData();
-                    render();
-                }
-            }
-        });
-    } else {
-        // Fallback for when Firebase isn't configured
-        const storedUser = localStorage.getItem('vocab_user_dev');
-        if (storedUser) {
-            currentUser = JSON.parse(storedUser);
-            finishLogin();
-        } else {
-            document.getElementById('login-overlay').classList.remove('hidden');
-            await loadData();
-            render();
-        }
-    }
+    await loadData();
+    render();
 
     // Search Listener
     searchInput.addEventListener('input', () => {
@@ -91,34 +32,24 @@ async function init() {
     });
 }
 
-async function finishLogin() {
-    updateProfileUI();
-    document.getElementById('login-overlay').classList.add('hidden');
-    await loadData();
-    render();
-}
-
 async function loadData() {
     try {
         const [wordsRes, savedRes] = await Promise.all([
-            fetch(`${API_URL}/words`),
-            currentUser ? fetch(`${API_URL}/saved-words`, { headers: { 'X-User-Email': currentUser.email } }) : Promise.resolve({ ok: false })
+            fetch(`${ API_URL }/words`),
+fetch(`${API_URL}/saved-words`)
         ]);
 
-        if (wordsRes.ok) allWords = await wordsRes.json();
-        if (savedRes.ok) savedList = await savedRes.json();
+if (wordsRes.ok) allWords = await wordsRes.json();
+if (savedRes.ok) savedList = await savedRes.json();
 
-        // If not logged in, savedList is empty or previous user's?
-        if (!currentUser) savedList = [];
+// Map Saved IDs
+savedIds = new Set(savedList.map(s => s.wordId));
 
-        // Map Saved IDs
-        savedIds = new Set(savedList.map(s => s.wordId));
-
-        // Update Count
-        savedCount.innerText = `(${savedList.length})`;
+// Update Count
+savedCount.innerText = `(${savedList.length})`;
     } catch (err) {
-        console.error("Error loading data:", err);
-    }
+    console.error("Error loading data:", err);
+}
 }
 
 // Helper: Format Date
@@ -250,7 +181,7 @@ function createCard(word, isSaved, isSavedView) {
         actionButton = `
             <button onclick="saveWord('${word.id}')" class="text-gray-500 hover:text-green-400 p-1 transition-colors" title="Save to My List">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 0 012 2v16l-7-3.5L5 21V5z" />
                 </svg>
             </button>
         `;
@@ -317,13 +248,10 @@ function switchTab(tab) {
 
 async function saveWord(id) {
     try {
-        if (!currentUser) return alert("Please sign in to save words.");
-
         const res = await fetch(`${API_URL}/saved-words`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'X-User-Email': currentUser.email
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({ wordId: id })
         });
@@ -332,25 +260,22 @@ async function saveWord(id) {
             render();
         }
     } catch (err) {
-        console.error(err);
+        console.error("Error saving word:", err);
     }
 }
 
 async function removeWord(e, id) {
     e.stopPropagation();
     try {
-        if (!currentUser) return;
-
         const res = await fetch(`${API_URL}/saved-words?id=${id}`, {
-            method: 'DELETE',
-            headers: { 'X-User-Email': currentUser.email }
+            method: 'DELETE'
         });
         if (res.ok) {
             await loadData();
             render();
         }
     } catch (err) {
-        console.error(err);
+        console.error("Error removing word:", err);
     }
 }
 
@@ -399,26 +324,25 @@ async function loadSentences(id) {
     prevSentencesList.innerHTML = '';
 
     try {
-        if (!currentUser) return;
-
-        const res = await fetch(`${API_URL}/sentences?wordId=${id}`, {
-            headers: { 'X-User-Email': currentUser.email }
-        });
+        const res = await fetch(`${API_URL}/sentences?wordId=${id}`);
         if (res.ok) {
             const sentences = await res.json();
             if (sentences && sentences.length > 0) {
                 prevSentencesContainer.classList.remove('hidden');
-                sentences.forEach(s => {
-                    const el = document.createElement('div');
-                    el.className = "bg-slate-900/30 p-3 rounded-lg text-gray-300 text-sm italic border-l-2 border-blue-500/50";
-                    el.innerText = `"${s.content}"`;
-                    prevSentencesList.appendChild(el);
-                });
+                prevSentencesList.innerHTML = sentences.map(s => `
+                    <div class="bg-slate-700/50 p-2 rounded text-sm text-gray-300 border-l-2 border-blue-500">
+                        ${s.content}
+                    </div>
+                `).join('');
             }
         }
     } catch (err) {
-        console.error(err);
+        console.error("Error loading sentences:", err);
     }
+
+    modalOverlay.classList.remove('hidden');
+    modalOverlay.classList.add('flex');
+    sentenceInput.focus();
 }
 
 async function saveSentence() {
@@ -428,8 +352,7 @@ async function saveSentence() {
         const res = await fetch(`${API_URL}/sentences`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'X-User-Email': currentUser.email
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({ wordId: practiceWord.id, content: sentenceInput.value })
         });
@@ -439,62 +362,10 @@ async function saveSentence() {
             loadSentences(practiceWord.id);
         }
     } catch (err) {
-        console.error(err);
-    }
-}
-
-// Auth Functions
-function googleLogin() {
-    if (!auth) return alert("Firebase not configured! Please add your config in script.js");
-
-    const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch((error) => {
-        console.error("Login failed:", error);
-        alert(`Login failed: ${error.message}`);
-    });
-}
-
-function handleCredentialResponse(response) {
-    // Deprecated GSI handler - keeping just in case but unused
-}
-
-function devLogin(email, name) {
-    currentUser = { email, name, picture: `https://ui-avatars.com/api/?name=${name}&background=random` };
-    localStorage.setItem('vocab_user_dev', JSON.stringify(currentUser)); // Use distinct key for dev
-    finishLogin();
-}
-
-function logout() {
-    if (auth) auth.signOut(); // Firebase Logout
-    currentUser = null;
-    localStorage.removeItem('vocab_user_dev'); // Clear dev user
-    location.reload();
-}
-
-function continueAsGuest() {
-    document.getElementById('login-overlay').classList.add('hidden');
-    document.getElementById('login-btn').classList.remove('hidden');
-}
-
-function showLogin() {
-    document.getElementById('login-overlay').classList.remove('hidden');
-}
-
-function updateProfileUI() {
-    if (currentUser) {
-        document.getElementById('user-profile').classList.remove('hidden');
-        document.getElementById('user-profile').classList.add('flex');
-        document.getElementById('login-btn').classList.add('hidden');
-
-        document.getElementById('user-name').innerText = currentUser.name;
-        document.getElementById('user-email').innerText = currentUser.email;
-        document.getElementById('user-avatar').src = currentUser.picture;
-    } else {
-        document.getElementById('user-profile').classList.add('hidden');
-        document.getElementById('user-profile').classList.remove('flex');
-        document.getElementById('login-btn').classList.remove('hidden');
+        console.error("Error saving sentence:", err);
     }
 }
 
 // Start
 init();
+```
