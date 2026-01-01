@@ -1,5 +1,25 @@
 const API_URL = "http://localhost:8080/api";
 
+// --- FIREBASE CONFIGURATION ---
+// REPLACE THIS OBJECT WITH YOUR OWN KEY from console.firebase.google.com
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+
+// Initialize Firebase
+let auth;
+try {
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+} catch (error) {
+    console.warn("Firebase not configured correctly yet. Using Dev Mode only.");
+}
+
 // State
 let allWords = [];
 let savedList = [];
@@ -23,28 +43,59 @@ const prevSentencesList = document.getElementById('previous-sentences-list');
 
 // Initialization
 async function init() {
-    // Check Local Storage
-    const storedUser = localStorage.getItem('vocab_user');
-    if (storedUser) {
-        currentUser = JSON.parse(storedUser);
-        updateProfileUI();
-        document.getElementById('login-overlay').classList.add('hidden');
-        await loadData();
-        render();
+    // Auth Listener
+    if (auth) {
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                // Firebase Login Success
+                currentUser = {
+                    email: user.email,
+                    name: user.displayName || user.email.split('@')[0],
+                    picture: user.photoURL || `https://ui-avatars.com/api/?name=${user.email}&background=random`
+                };
+                finishLogin();
+            } else {
+                // Check if Dev Mode was active (mock user)
+                const storedUser = localStorage.getItem('vocab_user_dev');
+                if (storedUser) {
+                    currentUser = JSON.parse(storedUser);
+                    finishLogin();
+                } else {
+                    // Show Login
+                    document.getElementById('login-overlay').classList.remove('hidden');
+                    document.getElementById('login-btn').classList.add('hidden');
+                    currentUser = null;
+                    savedList = []; // Clear private data
+                    updateProfileUI();
+                    await loadData();
+                    render();
+                }
+            }
+        });
     } else {
-        // Show Login
-        document.getElementById('login-overlay').classList.remove('hidden');
-        document.getElementById('login-btn').classList.add('hidden'); // Hide manual trigger initially
-        // Load public data anyway for background
-        await loadData();
-        render();
+        // Fallback for when Firebase isn't configured
+        const storedUser = localStorage.getItem('vocab_user_dev');
+        if (storedUser) {
+            currentUser = JSON.parse(storedUser);
+            finishLogin();
+        } else {
+            document.getElementById('login-overlay').classList.remove('hidden');
+            await loadData();
+            render();
+        }
     }
+
+    // Search Listener
+    searchInput.addEventListener('input', () => {
+        render();
+    });
 }
 
-// Search Listener
-searchInput.addEventListener('input', () => {
+async function finishLogin() {
+    updateProfileUI();
+    document.getElementById('login-overlay').classList.add('hidden');
+    await loadData();
     render();
-});
 }
 
 async function loadData() {
@@ -393,27 +444,30 @@ async function saveSentence() {
 }
 
 // Auth Functions
+function googleLogin() {
+    if (!auth) return alert("Firebase not configured! Please add your config in script.js");
+
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch((error) => {
+        console.error("Login failed:", error);
+        alert(`Login failed: ${error.message}`);
+    });
+}
+
 function handleCredentialResponse(response) {
-    const payload = decodeJwt(response.credential);
-    login(payload.email, payload.name, payload.picture);
+    // Deprecated GSI handler - keeping just in case but unused
 }
 
 function devLogin(email, name) {
-    login(email, name, `https://ui-avatars.com/api/?name=${name}&background=random`);
-}
-
-function login(email, name, picture) {
-    currentUser = { email, name, picture };
-    localStorage.setItem('vocab_user', JSON.stringify(currentUser));
-
-    document.getElementById('login-overlay').classList.add('hidden');
-    updateProfileUI();
-    init(); // Reload data for new user
+    currentUser = { email, name, picture: `https://ui-avatars.com/api/?name=${name}&background=random` };
+    localStorage.setItem('vocab_user_dev', JSON.stringify(currentUser)); // Use distinct key for dev
+    finishLogin();
 }
 
 function logout() {
+    if (auth) auth.signOut(); // Firebase Logout
     currentUser = null;
-    localStorage.removeItem('vocab_user');
+    localStorage.removeItem('vocab_user_dev'); // Clear dev user
     location.reload();
 }
 
@@ -433,22 +487,13 @@ function updateProfileUI() {
         document.getElementById('login-btn').classList.add('hidden');
 
         document.getElementById('user-name').innerText = currentUser.name;
+        document.getElementById('user-email').innerText = currentUser.email;
         document.getElementById('user-avatar').src = currentUser.picture;
     } else {
         document.getElementById('user-profile').classList.add('hidden');
         document.getElementById('user-profile').classList.remove('flex');
         document.getElementById('login-btn').classList.remove('hidden');
     }
-}
-
-// Simple JWT decode (for Google Credential)
-function decodeJwt(token) {
-    var base64Url = token.split('.')[1];
-    var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    var jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-    return JSON.parse(jsonPayload);
 }
 
 // Start

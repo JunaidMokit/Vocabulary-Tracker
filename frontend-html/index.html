@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VocabBuilder v2.0</title>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
     <style type="text/tailwindcss">
         @theme {
@@ -62,7 +63,8 @@
                     <img id="user-avatar" src="https://ui-avatars.com/api/?name=User&background=random" alt="User"
                         class="w-10 h-10 rounded-full border-2 border-purple-500">
                     <div>
-                        <p id="user-name" class="font-semibold text-white">Guest User</p>
+                        <p id="user-name" class="font-semibold text-white leading-tight">Guest User</p>
+                        <p id="user-email" class="text-xs text-gray-400 mb-0.5">guest@example.com</p>
                         <button onclick="logout()"
                             class="text-xs text-red-400 hover:text-red-300 transition-colors">Logout</button>
                     </div>
@@ -169,12 +171,18 @@
             <p class="text-gray-400 mb-8">Sign in to save your vocabulary progress.</p>
 
             <!-- Google Button Container -->
-            <div id="g_id_onload" data-client_id="YOUR_GOOGLE_CLIENT_ID" data-callback="handleCredentialResponse"
-                data-auto_prompt="false">
-            </div>
-            <div class="g_id_signin flex justify-center mb-6" data-type="standard" data-size="large"
-                data-theme="filled_black" data-text="sign_in_with" data-shape="pill" data-logo_alignment="left">
-            </div>
+            <button onclick="googleLogin()"
+                class="w-full py-3 rounded-full bg-white text-gray-900 border border-gray-300 hover:bg-gray-100 transition-all font-medium flex items-center justify-center gap-3 mb-6">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5"
+                    alt="Google">
+                Sign in with Google
+            </button>
+
+            <!-- Demo Login (Fallback) -->
+            <button onclick="devLogin('demo@example.com', 'Demo User')"
+                class="w-full py-2.5 rounded-full bg-slate-800 hover:bg-slate-700 text-gray-300 hover:text-white border border-slate-700 hover:border-slate-500 transition-all text-sm font-medium mb-4 flex items-center justify-center gap-2">
+                <span>⚡</span> Quick Demo Login
+            </button>
 
             <!-- Terms -->
             <p class="text-xs text-gray-600 mt-8">By continuing, you agree to our Terms of Service and Privacy Policy.
