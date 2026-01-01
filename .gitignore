@@ -1,0 +1,12 @@
+# Data Files (Runtime)
+backend/words.json
+backend/saved_words.json
+backend/sentences.json
+
+# System
+.DS_Store
+Thumbs.db
+
+# Go
+backend/vocab-builder.exe
+backend/go.sum

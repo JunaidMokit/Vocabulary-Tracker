@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VocabBuilder v2.0</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+        @theme {
+          --color-glass: rgba(255, 255, 255, 0.05);
+          --color-glass-border: rgba(255, 255, 255, 0.1);
+        }
+        @layer utilities {
+            .glass-card {
+                background-color: var(--color-glass);
+                backdrop-filter: blur(12px);
+                border: 1px solid var(--color-glass-border);
+            }
+            .animate-fade-in-down {
+                animation: fadeInDown 0.8s ease-out;
+            }
+            .animate-fade-in-up {
+                animation: fadeInUp 0.8s ease-out 0.2s backwards;
+            }
+        }
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        body {
+            background-color: #0f172a;
+            background-image: radial-gradient(ellipse at top, #1e293b, #0f172a, #000000);
+            min-height: 100vh;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="flex flex-col min-h-screen">
+
+    <div class="flex-grow max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <header class="mb-10 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="text-center md:text-left">
+                <h1
+                    class="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 mb-2 animate-fade-in-down drop-shadow-2xl">
+                    VocabBuilder <span class="text-2xl font-light text-gray-400 align-top">v2.0</span>
+                </h1>
+                <p class="text-xl text-gray-400 tracking-wide">Master your vocabulary with style and focus.</p>
+            </div>
+
+            <!-- User Profile (Hidden by default) -->
+            <div id="user-profile" class="hidden flex-col items-end animate-fade-in-down">
+                <div class="flex items-center gap-3">
+                    <img id="user-avatar" src="https://ui-avatars.com/api/?name=User&background=random" alt="User"
+                        class="w-10 h-10 rounded-full border-2 border-purple-500">
+                    <div>
+                        <p id="user-name" class="font-semibold text-white">Guest User</p>
+                        <button onclick="logout()"
+                            class="text-xs text-red-400 hover:text-red-300 transition-colors">Logout</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Login Trigger (Visible when guest) -->
+            <button id="login-btn" onclick="showLogin()"
+                class="hidden bg-slate-800 hover:bg-slate-700 text-white px-5 py-2 rounded-full border border-slate-700 transition-colors">
+                Sign In
+            </button>
+    </div>
+    </div>
+    </header>
+
+    <!-- Search Bar -->
+    <div class="max-w-md mx-auto mb-8 relative">
+        <input type="text" id="search-input" placeholder="Search for a word..."
+            class="w-full bg-slate-800/80 border border-slate-700 rounded-full py-3 px-12 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-lg backdrop-blur-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 absolute left-4 top-3.5 text-gray-500" fill="none"
+            viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex justify-center mb-10 space-x-4">
+        <button id="tab-browse" onclick="switchTab('browse')"
+            class="px-8 py-3 rounded-full font-semibold transition-all transform hover:scale-105 bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30">
+            Browse Words
+        </button>
+        <button id="tab-saved" onclick="switchTab('saved')"
+            class="px-8 py-3 rounded-full font-semibold transition-all transform hover:scale-105 bg-slate-800 text-gray-400 hover:bg-slate-700 hover:text-white">
+            My Saved List <span id="saved-count">(0)</span>
+        </button>
+    </div>
+
+    <!-- Section Title -->
+    <h2 id="section-title" class="text-2xl font-bold text-white mb-6 flex items-center gap-2 animate-fade-in-up">
+        <span class="text-blue-400">📚</span> Explore Vocabulary
+    </h2>
+
+    <!-- Content Area -->
+    <main id="word-grid" class="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 animate-fade-in-up">
+        <!-- Words will be injected here -->
+    </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="w-full bg-slate-900/80 border-t border-slate-800 py-8 mt-12 text-center backdrop-blur-sm">
+        <p class="text-gray-500 text-sm">
+            Designed & Developed by <span class="text-blue-400 font-semibold">Junaid Rahman Mokit</span>
+        </p>
+        <div class="mt-4">
+            <span class="text-xs text-gray-600">© 2026 VocabBuilder Inc.</span>
+        </div>
+    </footer>
+
+    <!-- Practice Modal -->
+    <div id="modal-overlay"
+        class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div
+            class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl transform transition-all scale-100">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 class="text-xl font-bold text-white">Practice with "<span id="modal-word-english"></span>"</h3>
+                    <p class="text-sm text-gray-400 mt-1">Write a sentence using this word.</p>
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="mb-6">
+                <textarea id="sentence-input"
+                    class="w-full bg-slate-900/50 border border-slate-700 rounded-xl p-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none h-32"
+                    placeholder="Example: The sunset was ephemeral but beautiful..."></textarea>
+                <div class="flex justify-end mt-3">
+                    <button onclick="saveSentence()"
+                        class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-6 rounded-lg transition-colors">
+                        Save Sentence
+                    </button>
+                </div>
+            </div>
+
+            <div id="previous-sentences-container" class="border-t border-slate-700 pt-4 hidden">
+                <h4 class="text-sm font-semibold text-gray-300 mb-3">Your Previous Sentences</h4>
+                <div id="previous-sentences-list" class="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                    <!-- Sentences injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Overlay -->
+    <div id="login-overlay"
+        class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl p-10 max-w-md w-full shadow-2xl text-center">
+            <h2 class="text-3xl font-bold text-white mb-2">Welcome Back</h2>
+            <p class="text-gray-400 mb-8">Sign in to save your vocabulary progress.</p>
+
+            <!-- Google Button Container -->
+            <div id="g_id_onload" data-client_id="YOUR_GOOGLE_CLIENT_ID" data-callback="handleCredentialResponse"
+                data-auto_prompt="false">
+            </div>
+            <div class="g_id_signin flex justify-center mb-6" data-type="standard" data-size="large"
+                data-theme="filled_black" data-text="sign_in_with" data-shape="pill" data-logo_alignment="left">
+            </div>
+
+            <!-- Terms -->
+            <p class="text-xs text-gray-600 mt-8">By continuing, you agree to our Terms of Service and Privacy Policy.
+            </p>
+
+            <div class="mt-6 pt-4 border-t border-slate-800">
+                <button onclick="continueAsGuest()"
+                    class="text-gray-400 hover:text-white text-sm transition-colors flex items-center justify-center gap-2 mx-auto group">
+                    <span>Continue as Guest</span>
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                            d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
