@@ -40,7 +40,7 @@ fetch(`${API_URL}/saved-words`)
         ]);
 
 if (wordsRes.ok) allWords = await wordsRes.json();
-if (savedRes.ok) savedList = await savedRes.json();
+if (savedRes.ok) savedList = (await savedRes.json()) || [];
 
 // Map Saved IDs
 savedIds = new Set(savedList.map(s => s.wordId));
